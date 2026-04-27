@@ -1,0 +1,21 @@
+"""
+Health check endpoint — used by Docker and smoke tests.
+"""
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+from app.core.dependencies import get_db
+
+router = APIRouter()
+
+
+@router.get("/health")
+def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+    return {"status": "ok" if db_ok else "degraded", "database": "ok" if db_ok else "error"}

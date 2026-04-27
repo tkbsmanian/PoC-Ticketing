@@ -106,7 +106,10 @@ def get_sync_adapter(settings: Settings = Depends(get_settings)) -> SyncAdapter:
     """
     global _adapter_instance
     if _adapter_instance is None:
-        if settings.SYNC_ADAPTER == "jira":
+        if settings.SYNC_ADAPTER == "mock":
+            from app.adapters.mock_adapter import MockSyncAdapter
+            _adapter_instance = MockSyncAdapter()
+        elif settings.SYNC_ADAPTER == "jira":
             from app.adapters.jira_adapter import JiraAdapter
             _adapter_instance = JiraAdapter(settings)
         elif settings.SYNC_ADAPTER == "azure_devops":

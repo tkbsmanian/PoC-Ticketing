@@ -34,6 +34,7 @@ import { DashboardPage } from '@/pages/it/DashboardPage'
 import { AdminPage } from '@/pages/admin/AdminPage'
 import { AuditLogView } from '@/pages/admin/AuditLogView'
 import { ForbiddenPage } from '@/pages/shared/ForbiddenPage'
+import { PasswordResetPage } from '@/pages/PasswordResetPage'
 
 export default function App() {
   return (
@@ -42,6 +43,8 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<PasswordResetPage />} />
+          <Route path="/reset-password" element={<PasswordResetPage />} />
           <Route path="/403" element={<ForbiddenPage />} />
 
           {/* Business portal */}
