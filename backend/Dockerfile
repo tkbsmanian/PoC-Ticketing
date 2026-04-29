@@ -12,8 +12,8 @@ RUN pip install --no-cache-dir -e .
 # Copy application code
 COPY app/ ./app/
 
-# Create data and uploads directories with correct ownership
-RUN mkdir -p /app/data /app/uploads && chown -R appuser:appuser /app
+# Create data and uploads directories
+RUN mkdir -p /data/uploads && chown -R appuser:appuser /app /data
 
 USER appuser
 
