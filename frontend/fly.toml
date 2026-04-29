@@ -3,9 +3,8 @@ primary_region = "iad"
 
 [build]
   dockerfile = "Dockerfile"
-
-[env]
-  # No env vars needed — static files served by nginx
+  [build.args]
+    VITE_API_URL = "https://ticketing-backend.fly.dev"
 
 [http_service]
   internal_port = 80

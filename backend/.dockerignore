@@ -1,0 +1,12 @@
+.venv
+venv
+__pycache__
+*.pyc
+tests
+.pytest_cache
+.hypothesis
+data
+uploads
+.env
+fly.toml
+.gitignore
