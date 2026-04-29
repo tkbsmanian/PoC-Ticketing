@@ -3,8 +3,6 @@ primary_region = "iad"
 
 [build]
   dockerfile = "Dockerfile"
-  [build.args]
-    VITE_API_URL = "https://ticketing-backend.fly.dev"
 
 [http_service]
   internal_port = 80
