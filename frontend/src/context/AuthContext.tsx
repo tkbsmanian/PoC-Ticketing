@@ -15,8 +15,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Restore session on mount — 401 is expected when not logged in
   useEffect(() => {
+    // Skip session restore on login/reset pages — no session expected
+    const path = window.location.pathname
+    if (path === '/login' || path.startsWith('/forgot-password') || path.startsWith('/reset-password')) {
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     authApi.me()
       .then(({ data }) => {
