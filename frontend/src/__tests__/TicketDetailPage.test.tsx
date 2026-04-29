@@ -3,24 +3,36 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { TicketDetailPage } from '@/pages/shared/TicketDetailPage'
 import { AuthContext } from '@/context/AuthContext'
-import type { AuthUser, TicketDetail } from '@/types'
+import type { AuthUser } from '@/types'
 
-const mockTicket: TicketDetail = {
-  id: 1, ticket_id: 'TKT-001', title: 'Test ticket',
-  description: 'Need help', status: 'In Progress',
-  urgency: 'Medium', priority: 'High', category: 'Hardware',
-  department_name: 'IT', submitter_name: 'Jane',
-  created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  sync_failed: false,
-  jira_task_id: 'BB-42',
-  jira_task_url: 'https://mock.atlassian.net/browse/BB-42',
-  cost: null, director_approval_required: false,
-  comments: [], attachments: [], history: [], approvals: [],
-}
-
+// All values must be INSIDE the factory — no top-level variable references
 vi.mock('@/api/tickets', () => ({
   ticketsApi: {
-    get: vi.fn().mockResolvedValue({ data: mockTicket }),
+    get: vi.fn().mockResolvedValue({
+      data: {
+        id: 1,
+        ticket_id: 'TKT-001',
+        title: 'Test ticket',
+        description: 'Need help',
+        status: 'In Progress',
+        urgency: 'Medium',
+        priority: 'High',
+        category: 'Hardware',
+        department_name: 'IT',
+        submitter_name: 'Jane',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        sync_failed: false,
+        jira_task_id: 'BB-42',
+        jira_task_url: 'https://mock.atlassian.net/browse/BB-42',
+        cost: null,
+        director_approval_required: false,
+        comments: [],
+        attachments: [],
+        history: [],
+        approvals: [],
+      },
+    }),
     updateStatus: vi.fn(),
     updateCategoryPriority: vi.fn(),
   },

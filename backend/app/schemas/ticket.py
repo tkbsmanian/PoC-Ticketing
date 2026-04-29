@@ -2,6 +2,9 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+from pydantic import BaseModel, Field, field_validator
+
+
 class CreateTicketRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str = Field(min_length=1, max_length=10000)
@@ -9,6 +12,13 @@ class CreateTicketRequest(BaseModel):
     urgency: str = Field(pattern="^(Low|Medium|High|Critical)$")
     cost: float | None = Field(default=None, ge=0)
     manager_id: int
+
+    @field_validator("title", "description")
+    @classmethod
+    def must_not_be_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Field must not be blank or whitespace only.")
+        return v
 
 
 class UpdateStatusRequest(BaseModel):

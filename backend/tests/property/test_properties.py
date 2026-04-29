@@ -23,6 +23,10 @@ from app.domain.approval_rules import requires_director_approval
 from app.domain.enums import TicketStatus, UrgencyLevel
 from app.domain.ticket_lifecycle import is_terminal, is_valid_transition, VALID_TRANSITIONS
 
+# Disable the 200ms deadline — DB setup per example is inherently slower
+h_settings.register_profile("no_deadline", deadline=None, suppress_health_check=list(HealthCheck))
+h_settings.load_profile("no_deadline")
+
 # ── Shared DB setup ───────────────────────────────────────────────────────────
 
 def make_db():
@@ -39,7 +43,6 @@ def make_db():
     title=st.text(min_size=1, max_size=255).filter(lambda s: s.strip()),
     description=st.text(min_size=1, max_size=1000).filter(lambda s: s.strip()),
 )
-@h_settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow])
 def test_property_1_valid_submission_creates_pending_ticket(title, description):
     from app.models.user import UserModel, DepartmentModel
     from app.models.ticket import TicketModel
@@ -91,28 +94,28 @@ def test_property_1_valid_submission_creates_pending_ticket(title, description):
 @given(
     bad_field=st.one_of(st.just(""), st.text(alphabet=" \t\n", min_size=1, max_size=50))
 )
-@h_settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
 def test_property_2_empty_fields_rejected(bad_field):
-    from app.models.user import UserModel, DepartmentModel
-    from app.models.ticket import TicketModel
-    from app.core.security import hash_password
-    from app.services.audit_service import AuditService
-    from app.services.sync_service import SyncService
-    from app.services.ticket_service import TicketService
-    from pydantic import ValidationError
     from app.schemas.ticket import CreateTicketRequest
+    from pydantic import ValidationError
 
-    # Validate at schema level — empty/whitespace should fail min_length=1
+    # A field is invalid if it is empty or whitespace-only after stripping
+    is_invalid = not bad_field.strip()
+
     for payload in [
         {"title": bad_field, "description": "valid desc", "department_id": 1, "urgency": "Low", "manager_id": 1},
         {"title": "valid title", "description": bad_field, "department_id": 1, "urgency": "Low", "manager_id": 1},
     ]:
-        try:
-            CreateTicketRequest(**payload)
-            # If it didn't raise, the field must have passed — only valid if non-empty after strip
-            assert payload["title"].strip() and payload["description"].strip()
-        except (ValidationError, ValueError):
-            pass  # expected for empty/whitespace
+        if is_invalid:
+            # Empty/whitespace-only fields must be rejected
+            try:
+                req = CreateTicketRequest(**payload)
+                # If schema accepted it, the value must not be blank after strip
+                field_val = req.title if payload["title"] == bad_field else req.description
+                assert field_val.strip(), (
+                    f"Schema accepted blank field: {repr(bad_field)}"
+                )
+            except (ValidationError, ValueError):
+                pass  # correctly rejected
 
 
 # ── Property 3: director_approval_required computed correctly ─────────────────
@@ -122,7 +125,6 @@ def test_property_2_empty_fields_rejected(bad_field):
     urgency=st.sampled_from(list(UrgencyLevel)),
     cost=st.one_of(st.none(), st.floats(min_value=0, max_value=100000, allow_nan=False)),
 )
-@h_settings(max_examples=100)
 def test_property_3_director_approval_flag(urgency, cost):
     result = requires_director_approval(urgency, cost)
     has_cost = cost is not None and cost > 0
@@ -137,7 +139,6 @@ def test_property_3_director_approval_flag(urgency, cost):
     current=st.sampled_from(list(TicketStatus)),
     target=st.sampled_from(list(TicketStatus)),
 )
-@h_settings(max_examples=100)
 def test_property_4_transitions_respect_lifecycle(current, target):
     result = is_valid_transition(current, target)
     expected = target in VALID_TRANSITIONS.get(current, set())
@@ -151,7 +152,6 @@ def test_property_4_transitions_respect_lifecycle(current, target):
 
 # Feature: internal-ticketing-system, Property 5: Audit log is append-only
 @given(n_mutations=st.integers(min_value=1, max_value=10))
-@h_settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
 def test_property_5_audit_log_append_only(n_mutations):
     from app.models.audit import AuditLogModel
     from app.services.audit_service import AuditService
@@ -174,7 +174,6 @@ def test_property_5_audit_log_append_only(n_mutations):
 
 # Feature: internal-ticketing-system, Property 6: Internal comments are hidden from non-IT roles
 @given(body=st.text(min_size=1, max_size=500))
-@h_settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
 def test_property_6_internal_comments_hidden(body):
     from app.models.comment import CommentModel
     from app.models.user import UserModel, DepartmentModel
@@ -223,7 +222,6 @@ def test_property_6_internal_comments_hidden(body):
 
 # Feature: internal-ticketing-system, Property 8: Approval sequence is strictly ordered
 @given(cost=st.floats(min_value=0.01, max_value=10000, allow_nan=False))
-@h_settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
 def test_property_8_director_row_absent_until_manager_approves(cost):
     from app.models.user import UserModel, DepartmentModel
     from app.models.ticket import ApprovalModel, TicketModel

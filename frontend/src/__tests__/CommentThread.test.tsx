@@ -4,6 +4,7 @@ import { CommentThread } from '@/pages/shared/CommentThread'
 import { AuthContext } from '@/context/AuthContext'
 import type { AuthUser, Comment } from '@/types'
 
+// No outer variables in mock factory
 vi.mock('@/api/comments', () => ({
   commentsApi: { create: vi.fn() },
 }))
@@ -59,7 +60,8 @@ describe('CommentThread', () => {
 
   it('shows internal badge on internal comments for IT', () => {
     renderThread('it_triage', [internalComment])
-    expect(screen.getByLabelText(/internal note/i)).toBeInTheDocument()
+    // Use aria-label which is unique
+    expect(screen.getByLabelText('Internal note')).toBeInTheDocument()
   })
 
   it('disables comment form on closed ticket', () => {
@@ -75,11 +77,11 @@ describe('CommentThread', () => {
 
   it('shows internal toggle for it_triage', () => {
     renderThread('it_triage', [])
-    expect(screen.getByText(/internal note/i)).toBeInTheDocument()
+    expect(screen.getByText(/internal note \(hidden from requester\)/i)).toBeInTheDocument()
   })
 
   it('does not show internal toggle for business_user', () => {
     renderThread('business_user', [])
-    expect(screen.queryByText(/internal note \(hidden/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/internal note \(hidden from requester\)/i)).not.toBeInTheDocument()
   })
 })

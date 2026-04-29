@@ -5,7 +5,7 @@ import { SubmitTicketPage } from '@/pages/business/SubmitTicketPage'
 import { AuthContext } from '@/context/AuthContext'
 import type { AuthUser } from '@/types'
 
-// Mock API calls
+// vi.mock factories must not reference outer variables — use inline values
 vi.mock('@/api/admin', () => ({
   adminApi: {
     listDepartments: vi.fn().mockResolvedValue({
@@ -26,7 +26,9 @@ vi.mock('@/api/tickets', () => ({
 }))
 
 vi.mock('@/api/attachments', () => ({
-  attachmentsApi: { upload: vi.fn().mockResolvedValue({ data: {} }) },
+  attachmentsApi: {
+    upload: vi.fn().mockResolvedValue({ data: {} }),
+  },
 }))
 
 const mockUser: AuthUser = {
@@ -45,38 +47,39 @@ function renderPage() {
 }
 
 describe('SubmitTicketPage', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks() })
 
   it('shows error when title is empty on submit', async () => {
     renderPage()
     await waitFor(() => screen.getByLabelText(/title/i))
-
     fireEvent.click(screen.getByRole('button', { name: /submit request/i }))
-
     await waitFor(() => {
       expect(screen.getByText(/title is required/i)).toBeInTheDocument()
     })
   })
 
-  it('shows director approval hint on cost field', async () => {
+  it('cost field has a hint about director approval', async () => {
     renderPage()
     await waitFor(() => screen.getByLabelText(/cost/i))
-    expect(screen.getByText(/director approval/i)).toBeInTheDocument()
+    // Use getAllByText since the hint may appear in multiple places
+    const hints = screen.getAllByText(/director approval/i)
+    expect(hints.length).toBeGreaterThan(0)
   })
 
-  it('shows director approval hint on urgency field', async () => {
+  it('urgency field has a hint about director approval for High/Critical', async () => {
     renderPage()
     await waitFor(() => screen.getByLabelText(/urgency/i))
-    expect(screen.getByText(/high or critical urgency requires director/i)).toBeInTheDocument()
+    // Check the hint text exists somewhere on the page
+    expect(
+      screen.getByText(/high or critical urgency requires director/i)
+    ).toBeInTheDocument()
   })
 
   it('shows error when file exceeds 10MB', async () => {
     renderPage()
     await waitFor(() => screen.getByLabelText(/attachments/i))
 
-    const bigFile = new File([new ArrayBuffer(11 * 1024 * 1024)], 'big.pdf', {
-      type: 'application/pdf',
-    })
+    const bigFile = new File(['x'.repeat(100)], 'big.pdf', { type: 'application/pdf' })
     Object.defineProperty(bigFile, 'size', { value: 11 * 1024 * 1024 })
 
     const input = screen.getByLabelText(/attachments/i)

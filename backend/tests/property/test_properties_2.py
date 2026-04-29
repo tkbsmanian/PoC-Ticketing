@@ -18,6 +18,10 @@ from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
 from app.domain.enums import TicketStatus, UserRole
 
+# Disable the 200ms deadline — DB setup per example is inherently slower
+h_settings.register_profile("no_deadline", deadline=None, suppress_health_check=list(HealthCheck))
+h_settings.load_profile("no_deadline")
+
 
 def make_db():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
@@ -56,7 +60,6 @@ def _seed_ticket(db, submitter_id, dept_id, status=TicketStatus.CLOSED.value):
 
 # Feature: internal-ticketing-system, Property 7: Soft-delete restricts visibility without data loss
 @given(st.just(True))  # parameterised to run via hypothesis
-@h_settings(max_examples=20, suppress_health_check=[HealthCheck.too_slow])
 def test_property_7_soft_delete_hides_ticket(_):
     from app.models.user import DepartmentModel
     from app.models.ticket import TicketModel
@@ -97,7 +100,6 @@ def test_property_7_soft_delete_hides_ticket(_):
 
 # Feature: internal-ticketing-system, Property 9: Comment round-trip preserves content and authorship
 @given(body=st.text(min_size=1, max_size=500).filter(lambda s: s.strip()))
-@h_settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow])
 def test_property_9_comment_round_trip(body):
     from app.models.user import DepartmentModel
     from app.models.comment import CommentModel
@@ -138,7 +140,6 @@ def test_property_9_comment_round_trip(body):
         UserRole.PLATFORM_ADMIN.value,
     ])
 )
-@h_settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
 def test_property_10_ticket_list_role_scoped(role):
     from app.models.user import DepartmentModel
     from app.repositories.ticket_repository import TicketRepository

@@ -1,6 +1,6 @@
 """
 Security utilities: password hashing, JWT creation/verification, token blocklist.
-No business logic here — pure cryptographic operations.
+Uses bcrypt directly (not passlib) to avoid the 72-byte truncation error in passlib 1.7.x.
 """
 
 import logging
@@ -8,29 +8,37 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# bcrypt cost factor 12 minimum per security steering rules
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
-
 # In-memory JTI blocklist for invalidated tokens (PoC).
 # Production: replace with Redis SET with TTL.
 _token_blocklist: set[str] = set()
+
+# bcrypt cost factor 12 minimum per security steering rules
+_BCRYPT_ROUNDS = 12
 
 
 # ── Password hashing ─────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
-    return _pwd_context.hash(plain)
+    """Hash a password with bcrypt. Truncates input to 72 bytes (bcrypt standard)."""
+    password_bytes = plain.encode("utf-8")[:72]
+    salt = bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)
+    return bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd_context.verify(plain, hashed)
+    """Verify a plain password against a bcrypt hash."""
+    try:
+        password_bytes = plain.encode("utf-8")[:72]
+        return bcrypt.checkpw(password_bytes, hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 # ── JWT ───────────────────────────────────────────────────────────────────────

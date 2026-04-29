@@ -20,9 +20,9 @@ export function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await login(email, password)
-      // Redirect based on role after login
-      const dest = from || (isBusinessUser ? '/portal/tickets' : '/it/tickets')
+      const loggedInUser = await login(email, password)
+      const itRoles = ['it_triage', 'it_manager', 'platform_admin', 'auditor']
+      const dest = from || (itRoles.includes(loggedInUser.role) ? '/it/tickets' : '/portal/tickets')
       navigate(dest, { replace: true })
     } catch {
       setError('Invalid email or password.')

@@ -5,11 +5,7 @@ import { UserManagement } from '@/pages/admin/UserManagement'
 import { AuthContext } from '@/context/AuthContext'
 import type { AuthUser } from '@/types'
 
-const mockUpdateUser = vi.fn().mockResolvedValue({ data: {} })
-const mockCreateUser = vi.fn().mockResolvedValue({
-  data: { id: 99, email: 'new@e.com', display_name: 'New', role: 'business_user', department_name: 'IT', is_active: true },
-})
-
+// All mock values must be defined INSIDE the factory — no outer variable references
 vi.mock('@/api/admin', () => ({
   adminApi: {
     listUsers: vi.fn().mockResolvedValue({
@@ -20,8 +16,10 @@ vi.mock('@/api/admin', () => ({
     listDepartments: vi.fn().mockResolvedValue({
       data: [{ id: 1, name: 'IT', is_active: true }],
     }),
-    createUser: mockCreateUser,
-    updateUser: mockUpdateUser,
+    createUser: vi.fn().mockResolvedValue({
+      data: { id: 99, email: 'new@e.com', display_name: 'New', role: 'business_user', department_name: 'IT', is_active: true },
+    }),
+    updateUser: vi.fn().mockResolvedValue({ data: {} }),
   },
 }))
 
@@ -41,7 +39,7 @@ function renderUserMgmt() {
 }
 
 describe('UserManagement', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks() })
 
   it('lists existing users', async () => {
     renderUserMgmt()
@@ -51,11 +49,12 @@ describe('UserManagement', () => {
   })
 
   it('deactivate button calls updateUser with is_active false', async () => {
+    const { adminApi } = await import('@/api/admin')
     renderUserMgmt()
     await waitFor(() => screen.getByText('Deactivate'))
     fireEvent.click(screen.getByText('Deactivate'))
     await waitFor(() => {
-      expect(mockUpdateUser).toHaveBeenCalledWith(1, { is_active: false })
+      expect(adminApi.updateUser).toHaveBeenCalledWith(1, { is_active: false })
     })
   })
 
@@ -71,8 +70,6 @@ describe('UserManagement', () => {
     renderUserMgmt()
     await waitFor(() => screen.getByText(/\+ add user/i))
     fireEvent.click(screen.getByText(/\+ add user/i))
-
-    // Submit without filling email — HTML5 validation prevents submission
     const emailInput = screen.getByLabelText(/email/i)
     expect(emailInput).toBeRequired()
   })

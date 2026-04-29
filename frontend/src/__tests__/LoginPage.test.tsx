@@ -23,7 +23,7 @@ function renderLogin(loginImpl = mockLogin) {
 }
 
 describe('LoginPage', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks() })
 
   it('renders email and password fields', () => {
     renderLogin()

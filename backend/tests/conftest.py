@@ -1,44 +1,71 @@
 """
-Shared pytest fixtures for integration tests.
-Uses an in-memory SQLite database — never touches the dev database.
+Integration test configuration.
+
+Strategy: use a single SQLite in-memory database for the entire test session.
+We patch app.db.session at import time using a pytest plugin hook so the
+engine is replaced before any test module imports app code.
 """
 
 import os
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-# Point to in-memory SQLite before importing app
+# ── Environment must be set before ANY app import ────────────────────────────
 os.environ.setdefault("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
 os.environ.setdefault("SYNC_ADAPTER", "mock")
 os.environ.setdefault("JIRA_BASE_URL", "https://mock.atlassian.net")
 os.environ.setdefault("JIRA_USER_EMAIL", "test@example.com")
 os.environ.setdefault("JIRA_API_TOKEN", "mock-token")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("UPLOAD_DIR", "/tmp/test_uploads")
 
+import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from fastapi.testclient import TestClient
+
+# ── Build a single shared in-memory engine ───────────────────────────────────
+# Use a named in-memory DB so all connections share the same data
+_TEST_DB_URL = "sqlite:///file::memory:?cache=shared&uri=true"
+TEST_ENGINE = create_engine(
+    _TEST_DB_URL,
+    connect_args={"check_same_thread": False, "uri": True},
+    echo=False,
+)
+TestingSessionLocal = sessionmaker(
+    autocommit=False, autoflush=False, bind=TEST_ENGINE
+)
+
+# ── Patch app.db.session BEFORE it is used anywhere ──────────────────────────
+import app.db.session as _db_session
+_db_session.engine = TEST_ENGINE
+_db_session.SessionLocal = TestingSessionLocal
+
+# ── Now safe to import app models and Base ────────────────────────────────────
+import app.models  # noqa: F401 — registers all ORM models with Base.metadata
 from app.db.base import Base
-from app.db.session import SessionLocal
-from app.main import app
 from app.core.dependencies import get_db
 from app.core.security import hash_password
 from app.models.user import UserModel, DepartmentModel
 
 
-TEST_DB_URL = "sqlite:///:memory:"
-engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# ── Create tables once for the whole session ─────────────────────────────────
+Base.metadata.create_all(bind=TEST_ENGINE)
 
 
 @pytest.fixture(autouse=True)
-def setup_db():
-    Base.metadata.create_all(bind=engine)
+def clean_tables():
+    """Truncate all tables between tests for isolation."""
     yield
-    Base.metadata.drop_all(bind=engine)
+    session = TestingSessionLocal()
+    try:
+        for table in reversed(Base.metadata.sorted_tables):
+            session.execute(table.delete())
+        session.commit()
+    finally:
+        session.close()
 
 
 @pytest.fixture
-def db():
+def db(clean_tables):
     session = TestingSessionLocal()
     try:
         yield session
@@ -48,6 +75,8 @@ def db():
 
 @pytest.fixture
 def client(db):
+    from app.main import app
+
     def override_get_db():
         try:
             yield db
@@ -55,10 +84,19 @@ def client(db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+
+    # Disable background workers during tests
+    import app.workers.sync_worker as sw
+    sw.start_sync_worker = lambda: None
+    sw.stop_sync_worker = lambda: None
+
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
+
     app.dependency_overrides.clear()
 
+
+# ── Shared fixtures ───────────────────────────────────────────────────────────
 
 @pytest.fixture
 def dept(db):
@@ -134,7 +172,6 @@ def admin_user(db, dept):
 
 
 def login(client, email: str, password: str = "password123"):
-    """Helper to log in and return authenticated client."""
     resp = client.post("/auth/login", json={"email": email, "password": password})
-    assert resp.status_code == 200, f"Login failed: {resp.text}"
+    assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
     return resp

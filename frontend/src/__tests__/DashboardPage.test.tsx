@@ -5,6 +5,7 @@ import { DashboardPage } from '@/pages/it/DashboardPage'
 import { AuthContext } from '@/context/AuthContext'
 import type { AuthUser } from '@/types'
 
+// No outer variables in mock factory
 vi.mock('@/api/admin', () => ({
   adminApi: {
     dashboard: vi.fn().mockResolvedValue({
@@ -43,16 +44,18 @@ describe('DashboardPage', () => {
     renderDashboard()
     await waitFor(() => {
       expect(screen.getByText('Pending')).toBeInTheDocument()
-      expect(screen.getByText('3')).toBeInTheDocument()
     })
+    // Count value for Pending is 3
+    const countCards = screen.getAllByText('3')
+    expect(countCards.length).toBeGreaterThan(0)
   })
 
   it('shows total open count', async () => {
     renderDashboard()
     await waitFor(() => {
       expect(screen.getByText(/total open/i)).toBeInTheDocument()
-      expect(screen.getByText('5')).toBeInTheDocument()
     })
+    expect(screen.getByText('5')).toBeInTheDocument()
   })
 
   it('shows sync health for it_triage', async () => {
@@ -65,8 +68,11 @@ describe('DashboardPage', () => {
   it('shows failed count with error styling when > 0', async () => {
     renderDashboard()
     await waitFor(() => {
-      const failedEl = screen.getByText('2')
-      expect(failedEl.closest('dd')).toHaveClass('sync-failed-count')
+      expect(screen.getByText(/jira sync health/i)).toBeInTheDocument()
     })
+    // Multiple elements may show "2" (e.g. In Progress count) — find the one in a dd.sync-failed-count
+    const allTwos = screen.getAllByText('2')
+    const failedDd = allTwos.find(el => el.closest('dd')?.classList.contains('sync-failed-count'))
+    expect(failedDd).toBeDefined()
   })
 })
