@@ -1,0 +1,44 @@
+# Environment files — never commit secrets
+backend/.env
+.env
+
+# TLS certificates — generated locally
+nginx/certs/cert.pem
+nginx/certs/key.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# SQLite database
+backend/data/
+*.db
+*.sqlite
+
+# Uploads
+backend/uploads/
+/tmp/test_uploads/
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# IDE
+.vscode/
+.idea/
+*.swp
