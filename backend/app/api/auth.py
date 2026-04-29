@@ -41,9 +41,10 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         key="access_token",
         value=token,
         httponly=True,
-        secure=settings.is_production(),
-        samesite="strict",
+        secure=True,
+        samesite="lax",
         max_age=settings.JWT_EXPIRY_HOURS * 3600,
+        path="/",
     )
     user = db.query(UserModel).filter(UserModel.email == payload.email).first()
     dept_name = user.department.name if user and user.department else None
