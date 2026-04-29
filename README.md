@@ -1,8 +1,20 @@
 # Internal Ticketing System — PoC
 
-A locally hosted internal ticketing portal for business users to submit service and business requests. Requests are visible in the portal and automatically create tasks in JIRA. Business users track status, comments, and history. IT users review, categorise, prioritise, and manage the full request lifecycle.
+An internal ticketing portal for business users to submit service and business requests. Requests are visible in the portal and automatically create tasks in JIRA. Business users track status, comments, and history. IT users review, categorise, prioritise, and manage the full request lifecycle.
 
-Built with **React + TypeScript** (frontend), **Python FastAPI** (backend), **SQLite** (database), and **nginx** (reverse proxy).
+**🌐 Live Demo: [https://ticketing-frontend.fly.dev](https://ticketing-frontend.fly.dev)**
+
+| Role | Email | Password |
+|---|---|---|
+| Platform Admin | admin@test.com | Test123! |
+| IT Manager | manager@test.com | Test123! |
+| IT Triage | it@test.com | Test123! |
+| Business User | user@test.com | Test123! |
+| Auditor | auditor@test.com | Test123! |
+
+Built with **React + TypeScript** (frontend), **Python FastAPI** (backend), **SQLite** (database), and **nginx** (reverse proxy). Deployed on **Fly.io** (free tier).
+
+![IT Operations Portal — Admin Dashboard](docs/images/portal-admin-dashboard.png)
 
 ---
 
@@ -22,8 +34,9 @@ Built with **React + TypeScript** (frontend), **Python FastAPI** (backend), **SQ
 12. [Manual Smoke Test Checklist](#manual-smoke-test-checklist)
 13. [Switching to Real JIRA](#switching-to-real-jira)
 14. [Stopping & Restarting](#stopping--restarting)
-15. [Spec Documents](#spec-documents)
-16. [Prompts Used to Build This](#prompts-used-to-build-this)
+15. [Fork & Deploy to Fly.io](#fork--deploy-to-flyio)
+16. [Spec Documents](#spec-documents)
+17. [Prompts Used to Build This](#prompts-used-to-build-this)
 
 ---
 
@@ -608,6 +621,129 @@ docker compose down -v
 # View logs
 docker compose logs backend --tail=50
 docker compose logs nginx --tail=20
+```
+
+---
+
+## Fork & Deploy to Fly.io
+
+Want to run your own instance? Fork this repo and deploy to Fly.io's free tier in under 15 minutes.
+
+### Step 1: Fork and clone
+
+Click **Fork** on GitHub, then:
+
+```bash
+git clone https://github.com/YOUR-USERNAME/PoC-Ticketing.git
+cd PoC-Ticketing
+```
+
+### Step 2: Install Fly CLI
+
+```bash
+# macOS
+brew install flyctl
+
+# Windows (PowerShell)
+powershell -Command "iwr https://fly.io/install.ps1 -useb | iex"
+```
+
+Then sign up or log in:
+
+```bash
+flyctl auth signup    # or: flyctl auth login
+```
+
+### Step 3: Deploy the backend
+
+```bash
+cd backend
+flyctl launch --name YOUR-APP-backend --no-deploy --region iad
+flyctl volumes create ticketing_data --size 1 --region iad
+flyctl secrets set \
+  SECRET_KEY=$(openssl rand -hex 32) \
+  JIRA_BASE_URL=https://placeholder.atlassian.net \
+  JIRA_USER_EMAIL=placeholder@example.com \
+  JIRA_API_TOKEN=placeholder-token \
+  FRONTEND_URL=https://YOUR-APP-frontend.fly.dev
+flyctl deploy
+```
+
+### Step 4: Deploy the frontend
+
+Edit `frontend/nginx-spa.conf` — replace `ticketing-backend.fly.dev` with `YOUR-APP-backend.fly.dev`:
+
+```nginx
+set $upstream https://YOUR-APP-backend.fly.dev;
+```
+
+Then:
+
+```bash
+cd ../frontend
+flyctl launch --name YOUR-APP-frontend --no-deploy --region iad
+flyctl deploy
+```
+
+### Step 5: Seed test users
+
+```bash
+flyctl ssh console -a YOUR-APP-backend
+```
+
+Inside SSH:
+
+```bash
+python -c "
+from app.db.session import SessionLocal
+from app.db.init_db import init_db
+from app.models.user import UserModel, DepartmentModel
+from app.core.security import hash_password
+init_db()
+db = SessionLocal()
+if not db.query(DepartmentModel).first():
+    dept = DepartmentModel(name='IT', is_active=True)
+    db.add(dept); db.commit()
+dept = db.query(DepartmentModel).first()
+users = [
+    ('admin@test.com', 'Platform Admin', 'platform_admin'),
+    ('manager@test.com', 'Jane Manager', 'it_manager'),
+    ('it@test.com', 'IT Triage', 'it_triage'),
+    ('user@test.com', 'Business User', 'business_user'),
+    ('auditor@test.com', 'Auditor', 'auditor'),
+]
+for email, name, role in users:
+    existing = db.query(UserModel).filter(UserModel.email == email).first()
+    if not existing:
+        u = UserModel(email=email, display_name=name, password_hash=hash_password('Test123!'), role=role, department_id=dept.id, is_active=True)
+        db.add(u)
+db.commit()
+print('Done')
+"
+exit
+```
+
+### Step 6: Open your portal
+
+Go to **https://YOUR-APP-frontend.fly.dev** and log in.
+
+### Managing your deployment
+
+```bash
+# View logs
+flyctl logs -a YOUR-APP-backend
+
+# Scale down (free — no resources used)
+flyctl scale count 0 -a YOUR-APP-backend
+flyctl scale count 0 -a YOUR-APP-frontend
+
+# Scale back up
+flyctl scale count 1 -a YOUR-APP-backend
+flyctl scale count 1 -a YOUR-APP-frontend
+
+# Redeploy after code changes
+cd backend && flyctl deploy
+cd frontend && flyctl deploy
 ```
 
 ---
