@@ -30,18 +30,21 @@ settings = get_settings()
 
 
 @router.post("/login", response_model=AuthUserResponse)
-def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     svc = AuthService(db)
     try:
         token = svc.login(payload.email, payload.password)
     except (InvalidCredentialsError, AccountInactiveError) as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
 
+    # Determine if original request was HTTPS (behind proxy)
+    is_secure = request.headers.get("x-forwarded-proto") == "https" or settings.is_production()
+
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=is_secure,
         samesite="lax",
         max_age=settings.JWT_EXPIRY_HOURS * 3600,
         path="/",
