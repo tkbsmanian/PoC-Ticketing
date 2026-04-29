@@ -11,11 +11,11 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Redirect to login on 401 (expired or missing session)
+// Redirect to login on 401 — but NOT if already on login page (avoids loop)
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
       window.location.href = '/login'
     }
     return Promise.reject(error)

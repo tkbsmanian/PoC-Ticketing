@@ -15,12 +15,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Restore session on mount
+  // Restore session on mount — 401 is expected when not logged in
   useEffect(() => {
+    let cancelled = false
     authApi.me()
-      .then(({ data }) => setUser(data))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false))
+      .then(({ data }) => {
+        if (!cancelled) setUser(data)
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {

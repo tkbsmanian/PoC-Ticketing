@@ -16,6 +16,11 @@ export function AuthGuard({ children, allowedRoles }: Props) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
+  // Don't redirect if already on login page
+  if (location.pathname === '/login') {
+    return <>{children}</>
+  }
+
   if (loading) {
     return <div className="loading-screen">Loading…</div>
   }
